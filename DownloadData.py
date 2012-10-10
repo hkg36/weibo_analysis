@@ -45,7 +45,7 @@ if __name__ == '__main__':
         shop_id_infos={}
 
         for center in ptl:
-            center=(39.931985,116.440918)
+            #center=(39.931985,116.440918)
             radius=0.01
             area=[[center[0]-radius,center[1]-radius],[center[0]+radius,center[1]+radius]]
 
