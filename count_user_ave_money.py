@@ -20,7 +20,8 @@ if __name__ == '__main__':
         all_money=0
         for one_log in shop_log:
             cost=shop_cost_list.get(one_log['shop'],0)
-            all_count+=len(one_log['times'])
-            all_money+=len(one_log['times'])*cost
+            all_count+=len(one_log['weibos'])
+            all_money+=len(one_log['weibos'])*cost
         ave_money=float(all_money)/all_count
         con.dianpin.user_log.update({"weibo_uid":one['weibo_uid']},{'$set':{'ave_cost':ave_money,'ave_cost_update_time':time.time()}})
+        print one['weibo_uid'],'done'
