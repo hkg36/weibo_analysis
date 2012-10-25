@@ -8,7 +8,8 @@ if __name__ == '__main__':
     cur=con.dianpin.user_log.find({})
     user_list=[]
     for one in cur:
-        user_list.append(one)
+        if one.get('ave_cost_update_time',0)<one['shop_log_update_time']:
+            user_list.append(one)
     for one in user_list:
         shop_log=one['shop_log']
         shop_ids=[line['shop'] for line in shop_log]

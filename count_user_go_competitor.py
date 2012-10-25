@@ -6,7 +6,11 @@ import re
 
 if __name__ == '__main__':
     con=pymongo.Connection('mongodb://xcj.server4,xcj.server2/?slaveOk=true')
-    master_shop=con.dianpin.shop.find_one({'dianpin_id':4683333},{'dianpin_id':1,'competitor':1,'weibo_users':1})
+    #港丽餐厅(大悦城店) 2384860
+    #海底捞（西单店）2114887
+    #麻辣诱惑(三里屯Village西南) 2814994
+    #6113943 4683333 6209778
+    master_shop=con.dianpin.shop.find_one({'dianpin_id':6209778},{'dianpin_id':1,'competitor':1,'weibo_users':1})
     competitor=master_shop['competitor']['list']
     master_weibo_users=master_shop['weibo_users']
 

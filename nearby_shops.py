@@ -4,9 +4,9 @@ import pymongo.errors
 import time
 import re
 #分析店铺周边的竞争对手，分析附近的微薄确定用户是否到达，制作店铺用户记录以及用户活动记录
-if __name__ == '__main__':
-    con=pymongo.Connection('mongodb://xcj.server4,xcj.server2/?slaveOk=true')
-    cur=con.dianpin.shop.find({'dianpin_id':6209778},{'dianpin_id':1,'loc':1,'dianpin_tag':1,'shopname':1})# 6113943 4683333 6209778
+def analysis_shop(dianpin_shopid):
+    con=pymongo.Connection('mongodb://xcj.server4')
+    cur=con.dianpin.shop.find({'dianpin_id':dianpin_shopid},{'dianpin_id':1,'loc':1,'dianpin_tag':1,'shopname':1})
     shops=[]
     fill_shop_ids={}
     for one in cur:
@@ -48,12 +48,12 @@ if __name__ == '__main__':
         oneshop=fill_shop_ids[shop_id]
         short_name=oneshop['name_short']
         shop_weibo=[]
-        to_remove_weibo_id=[]
+        to_remove_weibos=[]
         for weibo_id in all_weibo:
             one_weibo=all_weibo[weibo_id]
             if short_name in one_weibo['word']:
                 shop_weibo.append(one_weibo)
-                to_remove_weibo_id.append(weibo_id)
+                to_remove_weibos.append(one_weibo)
 
                 history=weibo_user_go_shop.get(one_weibo['uid'],{})
                 record=history.get(shop_id,set())
@@ -61,18 +61,26 @@ if __name__ == '__main__':
                 history[shop_id]=record
                 weibo_user_go_shop[one_weibo['uid']]=history
 
-        for id in to_remove_weibo_id:
-            del all_weibo[id]
+        to_remove_weibos.sort(lambda a,b:-cmp(a['weibo_id'],b['weibo_id']))
+        latest_weibo_user_id=[]
+        for rm_weibo in to_remove_weibos:
+            if len(latest_weibo_user_id)>=20:
+                break
+            if rm_weibo['uid'] not in latest_weibo_user_id:
+                latest_weibo_user_id.append(rm_weibo['uid'])
+
+        for rm_weibo in to_remove_weibos:
+            del all_weibo[rm_weibo['weibo_id']]
 
         weibo_user_ids={}
         for w in shop_weibo:
             s_time=weibo_user_ids.get(w['uid'],0)
-            weibo_user_ids['uid']=s_time+1
+            weibo_user_ids[w['uid']]=s_time+1
         weibo_user_ids_list=[]
         for uid in weibo_user_ids:
             weibo_user_ids_list.append((uid,weibo_user_ids[uid]))
         weibo_user_ids_list.sort(lambda a,b:-cmp(a[1],b[1]))
-        con.dianpin.shop.update({'dianpin_id':shop},{'$set':{'weibo_users':weibo_user_ids_list}})
+        con.dianpin.shop.update({'dianpin_id':shop_id},{'$set':{'weibo_users':weibo_user_ids_list,'latest_weibo_user':latest_weibo_user_id}})
 
     #记录用户行动历史，和旧数据合并
     for uid in weibo_user_go_shop:
@@ -98,3 +106,11 @@ if __name__ == '__main__':
         data['shop_log_update_time']=time.time()
         con.dianpin.user_log.update({'weibo_uid':uid},data,upsert=True)
 
+if __name__ == '__main__':
+#港丽餐厅(大悦城店) 2384860
+#海底捞（西单店）2114887
+#麻辣诱惑(三里屯Village西南) 2814994
+# 6113943 4683333 6209778
+    shop_ids=[2384860,2114887,2814994,6113943,4683333,6209778]
+    for sid in shop_ids:
+        analysis_shop(sid)
