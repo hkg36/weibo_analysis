@@ -6,42 +6,41 @@ import re
 #分析店铺周边的竞争对手，分析附近的微薄确定用户是否到达，制作店铺用户记录以及用户活动记录
 def analysis_shop(dianpin_shopid):
     con=pymongo.Connection('mongodb://xcj.server4')
-    cur=con.dianpin.shop.find({'dianpin_id':dianpin_shopid},{'dianpin_id':1,'loc':1,'dianpin_tag':1,'shopname':1})
-    shops=[]
+    shop=con.dianpin.shop.find_one({'dianpin_id':dianpin_shopid},{'dianpin_id':1,'loc':1,'dianpin_tag':1,'shopname':1})
+    if shop==None:
+        print 'shop not found'
+        return
     fill_shop_ids={}
-    for one in cur:
-        one['name_short']=re.sub('\([^\)]*\)','',one['shopname'],flags=re.I)
-        shops.append(one)
-        fill_shop_ids[one['dianpin_id']]=one
+    shop['name_short']=re.sub('(?i)\([^\)]*\)','',shop['shopname'])
+    fill_shop_ids[shop['dianpin_id']]=shop
     #找出周边所有竞争对手店铺
-    for one in shops:
-        loc=one.get('loc')
-        cur=con.dianpin.shop.find({"loc":{"$within":{"$center":[[loc['lat'],loc['lng']],0.01]}}},{'dianpin_id':1,'dianpin_tag':1,'loc':1,'shopname':1})
-        competitors=[]
-        for other in cur:
-            if other['dianpin_id']==one['dianpin_id']:
-                continue
-            tags=other['dianpin_tag']
-            other['match']=len(set(tags).intersection(set(one['dianpin_tag'])))
-            competitors.append(other)
-        competitors.sort(lambda a,b:-cmp(a['match'],b['match']))
-        competitors = competitors[0:40]
-        for shop in competitors:
-            shop['name_short']=re.sub('\([^\)]*\)','',shop['shopname'],flags=re.I)
-            fill_shop_ids[shop['dianpin_id']]=shop
-        competitors_id=[shop['_id'] for shop in competitors]
-        con.dianpin.shop.update({'dianpin_id':one['dianpin_id']},{"$set":{"competitor":{'list':competitors_id,'time':time.time()}}})
-        print 'processed',one['dianpin_id']
+    loc=shop.get('loc')
+    cur=con.dianpin.shop.find({"loc":{"$within":{"$center":[[loc['lat'],loc['lng']],0.01]}}},{'dianpin_id':1,'dianpin_tag':1,'loc':1,'shopname':1})
+    competitors=[]
+    for other in cur:
+        if other['dianpin_id']==shop['dianpin_id']:
+            continue
+        tags=other['dianpin_tag']
+        other['match']=len(set(tags).intersection(set(shop['dianpin_tag'])))
+        competitors.append(other)
+    competitors.sort(lambda a,b:-cmp(a['match'],b['match']))
+    competitors = competitors[0:40]
+    for shop_c in competitors:
+        shop_c['name_short']=re.sub('(?i)\([^\)]*\)','',shop_c['shopname'])
+        fill_shop_ids[shop_c['dianpin_id']]=shop_c
+    competitors_id=[s['dianpin_id'] for s in competitors]
+    con.dianpin.shop.update({'dianpin_id':shop['dianpin_id']},{"$set":{"competitor":{'list':competitors_id,'time':time.time()}}})
+    print 'processed',shop['dianpin_id']
 
     #找出周边所有地理位置微薄
     radius=0.015
-    center=shops[0]['loc']
+    center=shop['loc']
     area=[[center['lat']-radius,center['lng']-radius],[center['lat']+radius,center['lng']+radius]]
     cur=con.weibolist.weibo.find({'pos':{'$within':{'$box':area}}})
     all_weibo={}
     for line in cur:
         all_weibo[line['weibo_id']]=line
-
+    print 'read %d weibo'%len(all_weibo)
     #生成用户到店记录和用户行动历史
     weibo_user_go_shop={}
     for shop_id in fill_shop_ids:
@@ -93,8 +92,8 @@ def analysis_shop(dianpin_shopid):
             old_log={}
             shop_list=data.get('shop_log')
             if shop_list!=None:
-                for one in shop_list:
-                    old_log[one['shop']]=set(one['weibos'])
+                for shop in shop_list:
+                    old_log[shop['shop']]=set(shop['weibos'])
             for shop_id in new_log:
                 old_record=old_log.get(shop_id,set())
                 old_log[shop_id]=old_record.union(new_log[shop_id])
@@ -111,6 +110,11 @@ if __name__ == '__main__':
 #海底捞（西单店）2114887
 #麻辣诱惑(三里屯Village西南) 2814994
 # 6113943 4683333 6209778
-    shop_ids=[2384860,2114887,2814994,6113943,4683333,6209778]
+    """shop_ids=[2384860,2114887,2814994,6113943,4683333,6209778]
     for sid in shop_ids:
-        analysis_shop(sid)
+        analysis_shop(sid)"""
+    f=open('shop_id2.txt')
+    lines=f.readlines()
+    f.close()
+    for id in lines:
+        analysis_shop(int(id))

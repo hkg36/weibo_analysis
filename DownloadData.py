@@ -17,6 +17,8 @@ if __name__ == '__main__':
     sqlcur=sqldb.cursor()
     sqlcur.execute('select tag,lat,lng from geoweibopoint where lat>39.734727 and lng>116.149659 and lat<40.072546 and lng<116.611777')
     for tag,lat,lng in sqlcur:
+        if tag==None:
+            continue
         if tag in pointlist:
             ptl=pointlist[tag]
         else:
@@ -54,7 +56,7 @@ if __name__ == '__main__':
                 area[0][1],area[1][1]))
 
             for shopid,lat,lng,address,shopname in sqlcur:
-                shopname_short=re.sub('\([^\)]*\)','',shopname,flags=re.I)
+                shopname_short=re.sub('(?i)\([^\)]*\)','',shopname)
                 info={'id':shopid,'pos':[lat,lng],'src_name':shopname,'weibo_list':[],'user_list':set()}
                 shopinfos[shopname_short]=info
                 shop_id_infos[shopid]=info
