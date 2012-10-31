@@ -1,21 +1,19 @@
 #-*-coding:utf-8-*-
 import pymongo
-import pymongo.errors
+import sqlite3
 import time
 import re
-#分析店铺周边的竞争对手，分析附近的微薄确定用户是否到达，制作店铺用户记录以及用户活动记录
+#分析店铺周边的竞争对手
 def analysis_shop(dianpin_shopid):
     con=pymongo.Connection('mongodb://xcj.server4')
     shop=con.dianpin.shop.find_one({'dianpin_id':dianpin_shopid},{'dianpin_id':1,'loc':1,'dianpin_tag':1,'shopname':1})
     if shop==None:
         print 'shop not found'
         return
-    fill_shop_ids={}
     shop['name_short']=re.sub('(?i)\([^\)]*\)','',shop['shopname'])
-    fill_shop_ids[shop['dianpin_id']]=shop
     #找出周边所有竞争对手店铺
     loc=shop.get('loc')
-    cur=con.dianpin.shop.find({"loc":{"$within":{"$center":[[loc['lat'],loc['lng']],0.01]}}},{'dianpin_id':1,'dianpin_tag':1,'loc':1,'shopname':1})
+    cur=con.dianpin.shop.find({"loc":{"$within":{"$center":[[loc['lat'],loc['lng']],0.02]}}},{'dianpin_id':1,'dianpin_tag':1,'loc':1,'shopname':1})
     competitors=[]
     for other in cur:
         if other['dianpin_id']==shop['dianpin_id']:
@@ -24,17 +22,20 @@ def analysis_shop(dianpin_shopid):
         other['match']=len(set(tags).intersection(set(shop['dianpin_tag'])))
         competitors.append(other)
     competitors.sort(lambda a,b:-cmp(a['match'],b['match']))
-    competitors = competitors[0:40]
-    for shop_c in competitors:
-        shop_c['name_short']=re.sub('(?i)\([^\)]*\)','',shop_c['shopname'])
-        fill_shop_ids[shop_c['dianpin_id']]=shop_c
-    competitors_id=[s['dianpin_id'] for s in competitors]
+    competitors_id=[s['dianpin_id'] for s in competitors[0:40]]
     con.dianpin.shop.update({'dianpin_id':shop['dianpin_id']},{"$set":{"competitor":{'list':competitors_id,'time':time.time()}}})
     print 'processed',shop['dianpin_id']
-
+#分析附近的微薄确定用户是否到达，制作店铺用户记录以及用户活动记录
+def analysis_point(center):
+    print center
+    fill_shop_ids={}
+    con=pymongo.Connection('mongodb://xcj.server4')
+    cur=con.dianpin.shop.find({"loc":{"$within":{"$center":[[center['lat'],center['lng']],0.02]}}},{'dianpin_id':1,'dianpin_tag':1,'loc':1,'shopname':1})
+    for line in cur:
+        line['name_short']=re.sub('(?i)\([^\)]*\)','',line['shopname'])
+        fill_shop_ids[line['dianpin_id']]=line
     #找出周边所有地理位置微薄
-    radius=0.015
-    center=shop['loc']
+    radius=0.03
     area=[[center['lat']-radius,center['lng']-radius],[center['lat']+radius,center['lng']+radius]]
     cur=con.weibolist.weibo.find({'pos':{'$within':{'$box':area}}})
     all_weibo={}
@@ -113,8 +114,18 @@ if __name__ == '__main__':
     """shop_ids=[2384860,2114887,2814994,6113943,4683333,6209778]
     for sid in shop_ids:
         analysis_shop(sid)"""
-    f=open('shop_id2.txt')
+    """f=open('shop_id2.txt')
     lines=f.readlines()
     f.close()
     for id in lines:
-        analysis_shop(int(id))
+        analysis_shop(int(id))"""
+    con=sqlite3.connect('../fetchDianPin/GeoPointList.db')
+    cc=con.cursor()
+    cc.execute('select lat,lng from geoweibopoint')
+    all_point=[]
+    for lat,lng in cc:
+        all_point.append({'lat':lat,'lng':lng})
+    cc.close()
+
+    for pt in all_point:
+        analysis_point(pt)

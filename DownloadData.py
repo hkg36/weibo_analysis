@@ -28,6 +28,12 @@ if __name__ == '__main__':
 
     sqlcur.close()
 
+    con=pymongo.Connection('mongodb://xcj.server4,xcj.server2/?slaveOk=true')
+    con.slave_okay()
+    weibo_list=con.weibolist
+    weibo_l_w=weibo_list.weibo
+    weibo_l_u=weibo_list.user
+
     for point in pointlist:
         ptl=pointlist[point]
         point=point.replace(u'/',u'_')
@@ -37,11 +43,6 @@ if __name__ == '__main__':
             os.mkdir(root_path)
 
         sqldb=sqlite3.connect('../fetchDianPin/dianpinData.db')
-
-        con=pymongo.Connection('218.241.207.46',27017)
-        weibo_list=con.weibolist
-        weibo_l_w=weibo_list.weibo
-        weibo_l_u=weibo_list.user
 
         shopinfos={}
         shop_id_infos={}
@@ -101,6 +102,11 @@ if __name__ == '__main__':
         for u in u_cur:
             all_user_info[u['id']]=u
 
+        u_cur=con.dianpin.user_log.find({'weibo_uid':{'$in':user_go_shop.keys()}},{'weibo_uid':1,'ave_cost':1})
+        for u in u_cur:
+            if u['weibo_uid'] in all_user_info:
+                all_user_info[u['weibo_uid']]['ave_cost']=u['ave_cost']
+
         user_go_shop_temp=[]
         for uid in user_go_shop:
             shop_go=user_go_shop[uid]
@@ -125,11 +131,11 @@ if __name__ == '__main__':
         file.close()
 
         file=codecs.open(root_path+u'/客户.csv','w','GB2312','ignore')
-        file.write(u'微薄用户,用户名,关注,粉丝,到过店铺数,到过的店铺\n')
+        file.write(u'微薄用户,用户名,关注,粉丝,平均消费(元/次),到过店铺数,到过的店铺\n')
         for line in user_go_shop:
             user=line['user']
             go_list=line['go_list']
-            file.write(u'http://weibo.com/%s,%s,%d,%d,%d,'%(user['profile_url'],user['screen_name'],user['friends_count'],user['followers_count'],len(go_list)))
+            file.write(u'http://weibo.com/%s,%s,%d,%d,%.2f,%d,'%(user['profile_url'],user['screen_name'],user['friends_count'],user['followers_count'],user.get('ave_cost',0),len(go_list)))
             for one_shop in go_list:
                 file.write(u'%s %d次,'%(one_shop['shop']['src_name'],one_shop['time']))
             file.write('\n')
