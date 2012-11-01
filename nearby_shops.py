@@ -26,16 +26,18 @@ def analysis_shop(dianpin_shopid):
     con.dianpin.shop.update({'dianpin_id':shop['dianpin_id']},{"$set":{"competitor":{'list':competitors_id,'time':time.time()}}})
     print 'processed',shop['dianpin_id']
 #分析附近的微薄确定用户是否到达，制作店铺用户记录以及用户活动记录
+
 def analysis_point(center):
     print center
     fill_shop_ids={}
-    con=pymongo.Connection('mongodb://xcj.server4')
-    cur=con.dianpin.shop.find({"loc":{"$within":{"$center":[[center['lat'],center['lng']],0.02]}}},{'dianpin_id':1,'dianpin_tag':1,'loc':1,'shopname':1})
+    con=pymongo.Connection('mongodb://xcj.server4,xcj.server2/',read_preference=pymongo.ReadPreference.SECONDARY)
+    cur=con.dianpin.shop.find({"loc":{"$within":{"$center":[[center['lat'],center['lng']],0.01]}}},{'dianpin_id':1,'dianpin_tag':1,'loc':1,'shopname':1})
     for line in cur:
         line['name_short']=re.sub('(?i)\([^\)]*\)','',line['shopname'])
         fill_shop_ids[line['dianpin_id']]=line
+    print 'read %d shop'%len(fill_shop_ids)
     #找出周边所有地理位置微薄
-    radius=0.03
+    radius=0.015
     area=[[center['lat']-radius,center['lng']-radius],[center['lat']+radius,center['lng']+radius]]
     cur=con.weibolist.weibo.find({'pos':{'$within':{'$box':area}}})
     all_weibo={}
@@ -120,12 +122,19 @@ if __name__ == '__main__':
     for id in lines:
         analysis_shop(int(id))"""
     con=sqlite3.connect('../fetchDianPin/GeoPointList.db')
+    try:
+        con.execute('alter table geoweibopoint add column analysis_checked int default 0')
+    except Exception,e:
+        print e
     cc=con.cursor()
-    cc.execute('select lat,lng from geoweibopoint')
+    cc.execute('select id,lat,lng from geoweibopoint where analysis_checked=0')
     all_point=[]
-    for lat,lng in cc:
-        all_point.append({'lat':lat,'lng':lng})
-    cc.close()
+    for id,lat,lng in cc:
+        all_point.append({'id':id,'lat':lat,'lng':lng})
 
     for pt in all_point:
-        analysis_point(pt)
+        try:
+            analysis_point(pt)
+            con.execute('update geoweibopoint set analysis_checked=1 where id=?',(pt['id'],))
+        except Exception,e:
+            print e
