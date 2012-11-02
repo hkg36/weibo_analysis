@@ -4,7 +4,7 @@ import pymongo.errors
 import time
 import re
 if __name__ == '__main__':
-    con=pymongo.Connection('mongodb://xcj.server4,xcj.server2/?slaveOk=true')
+    con=pymongo.Connection('mongodb://xcj.server4,xcj.server2/',read_preference=pymongo.ReadPreference.SECONDARY)
     cur=con.dianpin.user_log.find({})
     user_list=[]
     for one in cur:

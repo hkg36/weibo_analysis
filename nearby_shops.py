@@ -37,12 +37,16 @@ def analysis_point(center):
         fill_shop_ids[line['dianpin_id']]=line
     print 'read %d shop'%len(fill_shop_ids)
     #找出周边所有地理位置微薄
-    radius=0.015
-    area=[[center['lat']-radius,center['lng']-radius],[center['lat']+radius,center['lng']+radius]]
-    cur=con.weibolist.weibo.find({'pos':{'$within':{'$box':area}}})
     all_weibo={}
-    for line in cur:
-        all_weibo[line['weibo_id']]=line
+    for x_i in range(-3,3):
+        for y_i in range(-3,3):
+            radius=0.005
+            area=[[center['lat']+radius*x_i,center['lng']+radius*y_i],[center['lat']+radius*(x_i+1),center['lng']+radius*(y_i+1)]]
+            cur=con.weibolist.weibo.find({'pos':{'$within':{'$box':area}}})
+            for line in cur:
+                all_weibo[line['weibo_id']]=line
+            print 'read pice %d,%d to %d weibo'%(x_i,y_i,len(all_weibo))
+
     print 'read %d weibo'%len(all_weibo)
     #生成用户到店记录和用户行动历史
     weibo_user_go_shop={}
