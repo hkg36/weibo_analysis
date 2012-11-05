@@ -13,10 +13,12 @@ def GetPlaceNameList():
     file.close()
     return addresses
 if __name__ == '__main__':
-    addrs=GetPlaceNameList()
+    #addrs=GetPlaceNameList()
 
     con=pymongo.Connection('mongodb://xcj.server4,xcj.server2/',read_preference=pymongo.ReadPreference.SECONDARY)
-    cur=con.dianping.shops.find({},{'atmosphere':1,'POI':1,'address':1,'shop_name':1,'tags':1,'recommend':1,'avg_price':1,'shop_id':1})
+    #con=pymongo.Connection('mongodb://xcj.server4/',read_preference=pymongo.ReadPreference.SECONDARY)
+    cur=con.dianping.shops.find({},{'atmosphere':1,'POI':1,'address':1,'shop_name':1,'tags':1,'recommend':1,'avg_price':1,
+                                    'shop_id':1,'alias':1})
     dianpin_shopdata={}
     for s in cur:
         shop={}
@@ -34,14 +36,21 @@ if __name__ == '__main__':
             shop['dianpin_poi']=s['POI']
             shop['shopname']=s['shop_name']
             ave_p=s.get('avg_price',0)
-            if ave_p is int:
+            if isinstance(ave_p,int):
                 shop['aver_cost']=int(ave_p)
-            elif ave_p is str and len(ave_p):
+            elif isinstance(ave_p,unicode) and len(ave_p):
                 shop['aver_cost']=int(ave_p)
-            if s.get('recommend') is str and len(s.get('recommend'))>0:
+            if isinstance(s.get('recommend'),unicode) and len(s.get('recommend'))>0:
                 shop['recommend']=list(set(re.split(r'[/,]+',s['recommend'])))
             if len(s.get('tags'))>0:
                 shop['dianpin_tag']=list(set(re.split(r'[/,]+',s['tags'])))
+            alias=s.get('alias','')
+            if isinstance(alias,unicode) and len(alias)>0:
+                p_pos=alias.find(',')
+                if p_pos==-1:
+                    shop['alias']=alias
+                else:
+                    shop['alias']=alias[0:p_pos]
             dianpin_shopdata[shop['dianpin_id']]=shop
         except Exception,e:
             print 'error %d'%s['shop_id']

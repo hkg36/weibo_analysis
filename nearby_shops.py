@@ -29,62 +29,88 @@ def analysis_shop(dianpin_shopid):
 
 def analysis_point(center):
     print center
-    fill_shop_ids={}
+    fill_shop_ids=[]
     con=pymongo.Connection('mongodb://xcj.server4,xcj.server2/',read_preference=pymongo.ReadPreference.SECONDARY)
-    cur=con.dianpin.shop.find({"loc":{"$within":{"$center":[[center['lat'],center['lng']],0.01]}}},{'dianpin_id':1,'dianpin_tag':1,'loc':1,'shopname':1})
+    #con=pymongo.Connection('mongodb://xcj.server4/',read_preference=pymongo.ReadPreference.SECONDARY)
+    cur=con.dianpin.shop.find({"loc":{"$within":{"$center":[[center['lat'],center['lng']],0.01]}}},
+        {'dianpin_id':1,'dianpin_tag':1,'loc':1,'shopname':1,'atmosphere':1,'recommend':1,'alias':1})
     for line in cur:
-        line['name_short']=re.sub('(?i)\([^\)]*\)','',line['shopname'])
-        fill_shop_ids[line['dianpin_id']]=line
+        line['shopname']=unicode(line['shopname'])
+        name_short=set((re.sub('(?i)\([^\)]*\)','',line['shopname']),))
+        if line.has_key('alias'):
+            name_short.add(line['alias'])
+        line['name_short']=name_short
+        alltag=set()
+        if line.has_key('dianpin_tag'):
+            alltag.update(line['dianpin_tag'])
+        if line.has_key('atmosphere'):
+            alltag.update(line['atmosphere'])
+        if line.has_key('recommend'):
+            alltag.update(line['recommend'])
+        line['alltag']=alltag
+        fill_shop_ids.append(line)
+
     print 'read %d shop'%len(fill_shop_ids)
     #找出周边所有地理位置微薄
     all_weibo={}
     for x_i in range(-3,3):
         for y_i in range(-3,3):
-            radius=0.005
+            radius=0.004
             area=[[center['lat']+radius*x_i,center['lng']+radius*y_i],[center['lat']+radius*(x_i+1),center['lng']+radius*(y_i+1)]]
             cur=con.weibolist.weibo.find({'pos':{'$within':{'$box':area}}})
             for line in cur:
+                line['clean_word']=re.sub(u"(?i)\w{0,4}://[\w\d./]*","",line['word'])
                 all_weibo[line['weibo_id']]=line
             print 'read pice %d,%d to %d weibo'%(x_i,y_i,len(all_weibo))
 
     print 'read %d weibo'%len(all_weibo)
     #生成用户到店记录和用户行动历史
     weibo_user_go_shop={}
-    for shop_id in fill_shop_ids:
-        oneshop=fill_shop_ids[shop_id]
-        short_name=oneshop['name_short']
-        shop_weibo=[]
-        to_remove_weibos=[]
-        for weibo_id in all_weibo:
-            one_weibo=all_weibo[weibo_id]
-            if short_name in one_weibo['word']:
-                shop_weibo.append(one_weibo)
-                to_remove_weibos.append(one_weibo)
+    shop_weibo_log={}
+    for weibo_id in all_weibo:
+        one_weibo=all_weibo[weibo_id]
+        match_shop_id=0
+        for oneshop in fill_shop_ids:
+            if oneshop['shopname'] in one_weibo['clean_word']:
+                match_shop_id=oneshop['dianpin_id']
+                break
+        if match_shop_id==0:
+            for oneshop in fill_shop_ids:
+                for s_name in oneshop['name_short']:
+                    if s_name in one_weibo['clean_word']:
+                        match_shop_id=oneshop['dianpin_id']
+                        break
+                if match_shop_id:
+                    break
+        if match_shop_id:
+            shop_weibo=shop_weibo_log.get(match_shop_id,None)
+            if shop_weibo==None:
+                shop_weibo=[]
+                shop_weibo_log[match_shop_id]=shop_weibo
+            shop_weibo.append(one_weibo)
 
-                history=weibo_user_go_shop.get(one_weibo['uid'],{})
-                record=history.get(shop_id,set())
-                record.add(one_weibo['weibo_id'])
-                history[shop_id]=record
-                weibo_user_go_shop[one_weibo['uid']]=history
+            history=weibo_user_go_shop.get(one_weibo['uid'],{})
+            record=history.get(match_shop_id,set())
+            record.add(one_weibo['weibo_id'])
+            history[match_shop_id]=record
+            weibo_user_go_shop[one_weibo['uid']]=history
 
-        to_remove_weibos.sort(lambda a,b:-cmp(a['weibo_id'],b['weibo_id']))
+    for shop_id in shop_weibo_log:
+        shop_weibo=shop_weibo_log.get(shop_id)
+        shop_weibo.sort(lambda a,b:-cmp(a['weibo_id'],b['weibo_id']))
+        #最近到店
         latest_weibo_user_id=[]
-        for rm_weibo in to_remove_weibos:
+        for rm_weibo in shop_weibo:
             if len(latest_weibo_user_id)>=20:
                 break
             if rm_weibo['uid'] not in latest_weibo_user_id:
                 latest_weibo_user_id.append(rm_weibo['uid'])
 
-        for rm_weibo in to_remove_weibos:
-            del all_weibo[rm_weibo['weibo_id']]
-
         weibo_user_ids={}
         for w in shop_weibo:
             s_time=weibo_user_ids.get(w['uid'],0)
             weibo_user_ids[w['uid']]=s_time+1
-        weibo_user_ids_list=[]
-        for uid in weibo_user_ids:
-            weibo_user_ids_list.append((uid,weibo_user_ids[uid]))
+        weibo_user_ids_list=weibo_user_ids.items()
         weibo_user_ids_list.sort(lambda a,b:-cmp(a[1],b[1]))
         con.dianpin.shop.update({'dianpin_id':shop_id},{'$set':{'weibo_users':weibo_user_ids_list,'latest_weibo_user':latest_weibo_user_id}})
 
@@ -137,8 +163,5 @@ if __name__ == '__main__':
         all_point.append({'id':id,'lat':lat,'lng':lng})
 
     for pt in all_point:
-        try:
-            analysis_point(pt)
-            con.execute('update geoweibopoint set analysis_checked=1 where id=?',(pt['id'],))
-        except Exception,e:
-            print e
+        analysis_point(pt)
+        con.execute('update geoweibopoint set analysis_checked=1 where id=?',(pt['id'],))
