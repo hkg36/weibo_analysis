@@ -3,6 +3,7 @@ import pymongo
 import sqlite3
 import time
 import re
+import mongo_autoreconnect
 #分析店铺周边的竞争对手
 def analysis_shop(dianpin_shopid):
     con=pymongo.Connection('mongodb://xcj.server4')
@@ -13,7 +14,7 @@ def analysis_shop(dianpin_shopid):
     shop['name_short']=re.sub('(?i)\([^\)]*\)','',shop['shopname'])
     #找出周边所有竞争对手店铺
     loc=shop.get('loc')
-    cur=con.dianpin.shop.find({"loc":{"$within":{"$center":[[loc['lat'],loc['lng']],0.02]}}},{'dianpin_id':1,'dianpin_tag':1,'loc':1,'shopname':1})
+    cur=con.dianpin.shop.find({"loc":{"$within":{"$center":[[loc['lat'],loc['lng']],0.02]}}},{'dianpin_id':1,'dianpin_tag':1,'loc':1,'shopname':1,'atmosphere':1,'recommend':1})
     competitors=[]
     for other in cur:
         if other['dianpin_id']==shop['dianpin_id']:
@@ -165,3 +166,4 @@ if __name__ == '__main__':
     for pt in all_point:
         analysis_point(pt)
         con.execute('update geoweibopoint set analysis_checked=1 where id=?',(pt['id'],))
+        con.commit()
