@@ -16,13 +16,18 @@ if __name__ == '__main__':
         cur=con.dianpin.shop.find({'dianpin_id':{'$in':shop_ids}},{'dianpin_id':1,'aver_cost':1})
         shop_cost_list={}
         for line in cur:
-            shop_cost_list[line['dianpin_id']]=line['aver_cost']
+            if 'aver_cost' in line:
+                shop_cost_list[line['dianpin_id']]=line['aver_cost']
         all_count=0
         all_money=0
         for one_log in shop_log:
-            cost=shop_cost_list.get(one_log['shop'],0)
-            all_count+=len(one_log['weibos'])
-            all_money+=len(one_log['weibos'])*cost
-        ave_money=float(all_money)/all_count
+            cost=shop_cost_list.get(one_log['shop'],-1)
+            if cost!=-1:
+                all_count+=len(one_log['weibos'])
+                all_money+=len(one_log['weibos'])*cost
+        if all_count:
+            ave_money=float(all_money)/all_count
+        else:
+            ave_money=0
         con.dianpin.user_log.update({"weibo_uid":one['weibo_uid']},{'$set':{'ave_cost':ave_money,'ave_cost_update_time':time.time()}})
         print one['weibo_uid'],'done'

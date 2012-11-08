@@ -4,35 +4,15 @@ import sqlite3
 import time
 import re
 import mongo_autoreconnect
-#分析店铺周边的竞争对手
-def analysis_shop(dianpin_shopid):
-    con=pymongo.Connection('mongodb://xcj.server4')
-    shop=con.dianpin.shop.find_one({'dianpin_id':dianpin_shopid},{'dianpin_id':1,'loc':1,'dianpin_tag':1,'shopname':1})
-    if shop==None:
-        print 'shop not found'
-        return
-    shop['name_short']=re.sub('(?i)\([^\)]*\)','',shop['shopname'])
-    #找出周边所有竞争对手店铺
-    loc=shop.get('loc')
-    cur=con.dianpin.shop.find({"loc":{"$within":{"$center":[[loc['lat'],loc['lng']],0.02]}}},{'dianpin_id':1,'dianpin_tag':1,'loc':1,'shopname':1,'atmosphere':1,'recommend':1})
-    competitors=[]
-    for other in cur:
-        if other['dianpin_id']==shop['dianpin_id']:
-            continue
-        tags=other['dianpin_tag']
-        other['match']=len(set(tags).intersection(set(shop['dianpin_tag'])))
-        competitors.append(other)
-    competitors.sort(lambda a,b:-cmp(a['match'],b['match']))
-    competitors_id=[s['dianpin_id'] for s in competitors[0:40]]
-    con.dianpin.shop.update({'dianpin_id':shop['dianpin_id']},{"$set":{"competitor":{'list':competitors_id,'time':time.time()}}})
-    print 'processed',shop['dianpin_id']
-#分析附近的微薄确定用户是否到达，制作店铺用户记录以及用户活动记录
+import MySQLdb
 
+def MySQLConnect():
+    return MySQLdb.connect(host="192.168.1.111",user="root",passwd="znb@xcj",db='data_mining_xcj')
+#分析附近的微薄确定用户是否到达，制作店铺用户记录以及用户活动记录
 def analysis_point(center):
     print center
     fill_shop_ids=[]
-    con=pymongo.Connection('mongodb://xcj.server4,xcj.server2/',read_preference=pymongo.ReadPreference.SECONDARY)
-    #con=pymongo.Connection('mongodb://xcj.server4/',read_preference=pymongo.ReadPreference.SECONDARY)
+    con=pymongo.Connection('mongodb://xcj.server4/',read_preference=pymongo.ReadPreference.SECONDARY)
     cur=con.dianpin.shop.find({"loc":{"$within":{"$center":[[center['lat'],center['lng']],0.01]}}},
         {'dianpin_id':1,'dianpin_tag':1,'loc':1,'shopname':1,'atmosphere':1,'recommend':1,'alias':1})
     for line in cur:
@@ -54,9 +34,11 @@ def analysis_point(center):
     print 'read %d shop'%len(fill_shop_ids)
     #找出周边所有地理位置微薄
     all_weibo={}
-    for x_i in range(-3,3):
-        for y_i in range(-3,3):
-            radius=0.004
+    HALF_PICE_COUNT=4
+    RADIUS=0.012
+    for x_i in range(-HALF_PICE_COUNT,HALF_PICE_COUNT):
+        for y_i in range(-HALF_PICE_COUNT,HALF_PICE_COUNT):
+            radius=RADIUS/HALF_PICE_COUNT
             area=[[center['lat']+radius*x_i,center['lng']+radius*y_i],[center['lat']+radius*(x_i+1),center['lng']+radius*(y_i+1)]]
             cur=con.weibolist.weibo.find({'pos':{'$within':{'$box':area}}})
             for line in cur:
@@ -66,7 +48,7 @@ def analysis_point(center):
 
     print 'read %d weibo'%len(all_weibo)
     #生成用户到店记录和用户行动历史
-    weibo_user_go_shop={}
+
     shop_weibo_log={}
     for weibo_id in all_weibo:
         one_weibo=all_weibo[weibo_id]
@@ -84,17 +66,41 @@ def analysis_point(center):
                 if match_shop_id:
                     break
         if match_shop_id:
-            shop_weibo=shop_weibo_log.get(match_shop_id,None)
+            shop_weibo=shop_weibo_log.get(match_shop_id)
             if shop_weibo==None:
                 shop_weibo=[]
                 shop_weibo_log[match_shop_id]=shop_weibo
             shop_weibo.append(one_weibo)
 
-            history=weibo_user_go_shop.get(one_weibo['uid'],{})
-            record=history.get(match_shop_id,set())
+    sqldb=MySQLConnect()
+    sqlc=sqldb.cursor()
+    for shop_id in shop_weibo_log:
+        shop_weibo=shop_weibo_log[shop_id]
+        for one_weibo in shop_weibo:
+            sqlc.execute('insert ignore shop_user_log(shop_id,weibo_uid,weibo_id,time) values(%s,%s,%s,%s)',
+                (shop_id,
+                one_weibo['uid'],
+                one_weibo['weibo_id'],
+                one_weibo['time']))
+
+    sqldb.commit()
+    sqlc.close()
+    sqldb.close()
+    return
+
+    weibo_user_go_shop={}
+    for shop_id in shop_weibo_log:
+        shop_weibo=shop_weibo_log[shop_id]
+        for one_weibo in shop_weibo:
+            history=weibo_user_go_shop.get(one_weibo['uid'])
+            if history==None:
+                history={}
+                weibo_user_go_shop[one_weibo['uid']]=history
+            record=history.get(shop_id)
+            if record==None:
+                record=set()
+                history[shop_id]=record
             record.add(one_weibo['weibo_id'])
-            history[match_shop_id]=record
-            weibo_user_go_shop[one_weibo['uid']]=history
 
     for shop_id in shop_weibo_log:
         shop_weibo=shop_weibo_log.get(shop_id)
@@ -118,23 +124,27 @@ def analysis_point(center):
     #记录用户行动历史，和旧数据合并
     for uid in weibo_user_go_shop:
         new_log=weibo_user_go_shop[uid]
-        data=con.dianpin.user_log.find_one({'weibo_uid':uid})
-        if data==None:
-            data={'weibo_uid':uid}
+        data=con.dianpin.user_log.find_one({'weibo_uid':uid},{'shop_log':1,'weibo_uid':1})
+        if data==None or 'shop_log' not in data:
+            data={}
             old_log=new_log
         else:
             old_log={}
             shop_list=data.get('shop_log')
-            if shop_list!=None:
+            if shop_list:
                 for shop in shop_list:
                     old_log[shop['shop']]=set(shop['weibos'])
             for shop_id in new_log:
-                old_record=old_log.get(shop_id,set())
-                old_log[shop_id]=old_record.union(new_log[shop_id])
+                old_record=old_log.get(shop_id)
+                if old_record==None:
+                    old_log[shop_id]=new_log[shop_id]
+                else:
+                    old_record.update(new_log[shop_id])
 
         shop_list=[]
         for shop_id in old_log:
             shop_list.append({'shop':shop_id,'weibos':list(old_log[shop_id])})
+        data['weibo_uid']=uid
         data['shop_log']=shop_list
         data['shop_log_update_time']=time.time()
         con.dianpin.user_log.update({'weibo_uid':uid},data,upsert=True)
@@ -167,3 +177,11 @@ if __name__ == '__main__':
         analysis_point(pt)
         con.execute('update geoweibopoint set analysis_checked=1 where id=?',(pt['id'],))
         con.commit()
+
+    sqlcon=MySQLConnect()
+    sqlc=sqlcon.cursor()
+    sqlc.execute('Truncate shop_user')
+    sqlc.execute('insert into shop_user(shop_id,weibo_uid,counts) select shop_id,weibo_uid,count(*) from shop_user_log group by shop_id,weibo_uid')
+    sqlcon.commit()
+    sqlc.close()
+    sqlcon.close()
