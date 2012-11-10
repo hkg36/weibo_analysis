@@ -86,68 +86,6 @@ def analysis_point(center):
     sqldb.commit()
     sqlc.close()
     sqldb.close()
-    return
-
-    weibo_user_go_shop={}
-    for shop_id in shop_weibo_log:
-        shop_weibo=shop_weibo_log[shop_id]
-        for one_weibo in shop_weibo:
-            history=weibo_user_go_shop.get(one_weibo['uid'])
-            if history==None:
-                history={}
-                weibo_user_go_shop[one_weibo['uid']]=history
-            record=history.get(shop_id)
-            if record==None:
-                record=set()
-                history[shop_id]=record
-            record.add(one_weibo['weibo_id'])
-
-    for shop_id in shop_weibo_log:
-        shop_weibo=shop_weibo_log.get(shop_id)
-        shop_weibo.sort(lambda a,b:-cmp(a['weibo_id'],b['weibo_id']))
-        #最近到店
-        latest_weibo_user_id=[]
-        for rm_weibo in shop_weibo:
-            if len(latest_weibo_user_id)>=20:
-                break
-            if rm_weibo['uid'] not in latest_weibo_user_id:
-                latest_weibo_user_id.append(rm_weibo['uid'])
-
-        weibo_user_ids={}
-        for w in shop_weibo:
-            s_time=weibo_user_ids.get(w['uid'],0)
-            weibo_user_ids[w['uid']]=s_time+1
-        weibo_user_ids_list=weibo_user_ids.items()
-        weibo_user_ids_list.sort(lambda a,b:-cmp(a[1],b[1]))
-        con.dianpin.shop.update({'dianpin_id':shop_id},{'$set':{'weibo_users':weibo_user_ids_list,'latest_weibo_user':latest_weibo_user_id}})
-
-    #记录用户行动历史，和旧数据合并
-    for uid in weibo_user_go_shop:
-        new_log=weibo_user_go_shop[uid]
-        data=con.dianpin.user_log.find_one({'weibo_uid':uid},{'shop_log':1,'weibo_uid':1})
-        if data==None or 'shop_log' not in data:
-            data={}
-            old_log=new_log
-        else:
-            old_log={}
-            shop_list=data.get('shop_log')
-            if shop_list:
-                for shop in shop_list:
-                    old_log[shop['shop']]=set(shop['weibos'])
-            for shop_id in new_log:
-                old_record=old_log.get(shop_id)
-                if old_record==None:
-                    old_log[shop_id]=new_log[shop_id]
-                else:
-                    old_record.update(new_log[shop_id])
-
-        shop_list=[]
-        for shop_id in old_log:
-            shop_list.append({'shop':shop_id,'weibos':list(old_log[shop_id])})
-        data['weibo_uid']=uid
-        data['shop_log']=shop_list
-        data['shop_log_update_time']=time.time()
-        con.dianpin.user_log.update({'weibo_uid':uid},data,upsert=True)
 
 if __name__ == '__main__':
 #港丽餐厅(大悦城店) 2384860
