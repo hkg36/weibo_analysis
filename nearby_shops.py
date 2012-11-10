@@ -120,6 +120,7 @@ if __name__ == '__main__':
     sqlc=sqlcon.cursor()
     sqlc.execute('Truncate shop_user')
     sqlc.execute('insert into shop_user(shop_id,weibo_uid,counts) select shop_id,weibo_uid,count(*) from shop_user_log group by shop_id,weibo_uid')
+    sqlc.execute('insert into user_profile (weibo_uid,ave_cost) select weibo_uid,sum(counts*avg_price)/sum(counts) from (select weibo_uid,counts,avg_price from shop_user inner join shops on shops.shop_id=shop_user.shop_id where avg_price!=0) a group by weibo_uid ON DUPLICATE KEY UPDATE ave_cost=values(ave_cost)')
     sqlcon.commit()
     sqlc.close()
     sqlcon.close()
