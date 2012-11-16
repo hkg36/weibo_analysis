@@ -7,7 +7,7 @@ import mongo_autoreconnect
 import MySQLdb
 
 def MySQLConnect():
-    return MySQLdb.connect(host="192.168.1.111",user="root",passwd="znb@xcj",db='data_mining_xcj')
+    return MySQLdb.connect(host="192.168.1.111",user="root",passwd="mysql@xcj",db='data_mining_xcj')
 #分析附近的微薄确定用户是否到达，制作店铺用户记录以及用户活动记录
 def analysis_point(center):
     print center
@@ -36,9 +36,9 @@ def analysis_point(center):
     all_weibo={}
     HALF_PICE_COUNT=4
     RADIUS=0.012
+    radius=RADIUS/HALF_PICE_COUNT
     for x_i in range(-HALF_PICE_COUNT,HALF_PICE_COUNT):
         for y_i in range(-HALF_PICE_COUNT,HALF_PICE_COUNT):
-            radius=RADIUS/HALF_PICE_COUNT
             area=[[center['lat']+radius*x_i,center['lng']+radius*y_i],[center['lat']+radius*(x_i+1),center['lng']+radius*(y_i+1)]]
             cur=con.weibolist.weibo.find({'pos':{'$within':{'$box':area}}})
             for line in cur:

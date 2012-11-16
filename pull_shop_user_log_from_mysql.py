@@ -10,7 +10,7 @@ def MongoDBConnect():
     return pymongo.Connection('mongodb://xcj.server2/')
 def MySQLConnect():
     #return MySQLdb.connect(host="localhost",user="root",passwd="123456",db='data_mining_xcj')
-    return MySQLdb.connect(host="192.168.1.111",user="root",passwd="znb@xcj",db='data_mining_xcj')
+    return MySQLdb.connect(host="192.168.1.111",user="root",passwd="mysql@xcj",db='data_mining_xcj')
 def Pull_shop_user_from_mysql():
     sqlcon=MySQLConnect()
     sqlc=sqlcon.cursor(MySQLdb.cursors.DictCursor)
@@ -84,34 +84,22 @@ def Pull_user_log_from_mysql():
     sqlc.close()
     sqlcon.close()
     con.close()
-    #记录用户行动历史，和旧数据合并
-    """for uid in weibo_user_go_shop:
-        new_log=weibo_user_go_shop[uid]
-        data=con.dianpin.user_log.find_one({'weibo_uid':uid},{'shop_log':1,'weibo_uid':1})
-        if data==None or 'shop_log' not in data:
-            data={}
-            old_log=new_log
-        else:
-            old_log={}
-            shop_list=data.get('shop_log')
-            if shop_list:
-                for shop in shop_list:
-                    old_log[shop['shop']]=set(shop['weibos'])
-            for shop_id in new_log:
-                old_record=old_log.get(shop_id)
-                if old_record==None:
-                    old_log[shop_id]=new_log[shop_id]
-                else:
-                    old_record.update(new_log[shop_id])
+def Pull_user_ave_cost_from_mysql():
+    sqlcon=MySQLConnect()
+    sqlc=sqlcon.cursor(MySQLdb.cursors.DictCursor)
+    sqlc.execute('select weibo_uid,ave_cost from user_profile')
+    con=MongoDBConnect()
 
-        shop_list=[]
-        for shop_id in old_log:
-            shop_list.append({'shop':shop_id,'weibos':list(old_log[shop_id])})
-        data['weibo_uid']=uid
-        data['shop_log']=shop_list
-        data['shop_log_update_time']=time.time()
-        con.dianpin.user_log.update({'weibo_uid':uid},data,upsert=True)"""
+    while True:
+        line=sqlc.fetchone()
+        if line==None:
+            break
+        con.dianpin.user_log.update({'weibo_uid':line['weibo_uid']},{'$set':{'ave_cost':line['ave_cost']}})
+    sqlc.close()
+    sqlcon.close()
+    con.close()
 if __name__ == '__main__':
-    #Pull_shop_user_from_mysql()
-    #Pull_shop_latest_user_from_mysql()
+    Pull_shop_user_from_mysql()
+    Pull_shop_latest_user_from_mysql()
     Pull_user_log_from_mysql()
+    Pull_user_ave_cost_from_mysql()
