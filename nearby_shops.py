@@ -87,6 +87,8 @@ def analysis_point(center):
     sqlc.close()
     sqldb.close()
 
+    return 0
+
 if __name__ == '__main__':
 #港丽餐厅(大悦城店) 2384860
 #海底捞（西单店）2114887

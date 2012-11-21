@@ -49,7 +49,7 @@ def count_user_go_competitor(shop_id):
     for ws in watch_shop:
         if ws in competitor:
             competitor.remove(ws)
-    master_weibo_users=master_shop['weibo_users']
+    master_weibo_users=master_shop.get('weibo_users',[])
 
     find_shop_info=watch_shop[:]
     find_shop_info.extend(competitor)
@@ -95,9 +95,15 @@ if __name__ == '__main__':
 #海底捞（西单店）2114887
 #麻辣诱惑(三里屯Village西南) 2814994
 #6113943 4683333 6209778
-    shop_ids=[2384860,2114887,2814994,6113943,4683333,6209778]
-    #shop_ids=[6209778]
+    #shop_ids=[2384860,2114887,2814994,6113943,4683333,6209778]
+    shop_ids=[6116768]
     for sid in shop_ids:
-        find_shop_competitor(sid)
+        try:
+            find_shop_competitor(sid)
+        except Exception,e:
+            print e
     for sid in shop_ids:
-        count_user_go_competitor(sid)
+        try:
+            count_user_go_competitor(sid)
+        except Exception,e:
+            print e
