@@ -5,14 +5,16 @@ import time
 import re
 import mongo_autoreconnect
 import MySQLdb
+import env_data
+import multiprocessing
 
 def MySQLConnect():
-    return MySQLdb.connect(host="192.168.1.111",user="root",passwd="mysql@xcj",db='data_mining_xcj')
+    return MySQLdb.connect(host=env_data.mysql_host,user=env_data.mysql_user,passwd=env_data.mysql_psw,db='data_mining_xcj')
 #分析附近的微薄确定用户是否到达，制作店铺用户记录以及用户活动记录
 def analysis_point(center):
     print center
     fill_shop_ids=[]
-    con=pymongo.Connection('mongodb://xcj.server4/',read_preference=pymongo.ReadPreference.SECONDARY)
+    con=pymongo.Connection(env_data.mongo_connect_str,read_preference=pymongo.ReadPreference.SECONDARY_ONLY)
     cur=con.dianpin.shop.find({"loc":{"$within":{"$center":[[center['lat'],center['lng']],0.01]}}},
         {'dianpin_id':1,'dianpin_tag':1,'loc':1,'shopname':1,'atmosphere':1,'recommend':1,'alias':1})
     for line in cur:
@@ -34,7 +36,7 @@ def analysis_point(center):
     print 'read %d shop'%len(fill_shop_ids)
     #找出周边所有地理位置微薄
     all_weibo={}
-    HALF_PICE_COUNT=4
+    HALF_PICE_COUNT=10
     RADIUS=0.012
     radius=RADIUS/HALF_PICE_COUNT
     for x_i in range(-HALF_PICE_COUNT,HALF_PICE_COUNT):
@@ -108,15 +110,22 @@ if __name__ == '__main__':
     except Exception,e:
         print e
     cc=con.cursor()
-    cc.execute('select id,lat,lng from geoweibopoint where analysis_checked=0')
+    cc.execute('select id,lat,lng from geoweibopoint')
     all_point=[]
     for id,lat,lng in cc:
         all_point.append({'id':id,'lat':lat,'lng':lng})
 
-    for pt in all_point:
+    """for pt in all_point:
         analysis_point(pt)
         con.execute('update geoweibopoint set analysis_checked=1 where id=?',(pt['id'],))
-        con.commit()
+        con.commit()"""
+
+    pool = multiprocessing.Pool(processes=4)
+    for pt in all_point:
+        pool.apply_async(analysis_point, (pt, ))
+    pool.close()
+    pool.join()
+    print "Sub-process(es) done."
 
     sqlcon=MySQLConnect()
     sqlc=sqlcon.cursor()

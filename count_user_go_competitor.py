@@ -3,9 +3,11 @@ import pymongo
 import pymongo.errors
 import time
 import re
+import env_data
+import MySQLdb
 #分析店铺周边的竞争对手
 def find_shop_competitor(dianpin_shopid):
-    con=pymongo.Connection('mongodb://xcj.server4,xcj.server2/',read_preference=pymongo.ReadPreference.SECONDARY)
+    con=pymongo.Connection(env_data.mongo_connect_str,read_preference=pymongo.ReadPreference.SECONDARY)
     shop=con.dianpin.shop.find_one({'dianpin_id':dianpin_shopid},{'dianpin_id':1,'loc':1,'dianpin_tag':1,'shopname':1,
                                                                   'atmosphere':1,'recommend':1})
     if shop==None:
@@ -41,7 +43,7 @@ def find_shop_competitor(dianpin_shopid):
     print 'processed',shop['dianpin_id']
 
 def count_user_go_competitor(shop_id):
-    con=pymongo.Connection('mongodb://xcj.server4,xcj.server2/',read_preference=pymongo.ReadPreference.SECONDARY)
+    con=pymongo.Connection(env_data.mongo_connect_str,read_preference=pymongo.ReadPreference.SECONDARY)
     master_shop=con.dianpin.shop.find_one({'dianpin_id':shop_id},{'dianpin_id':1,'competitor':1,'weibo_users':1,'watch_shop':1})
     competitor=master_shop['competitor']['list']
 
@@ -96,7 +98,21 @@ if __name__ == '__main__':
 #麻辣诱惑(三里屯Village西南) 2814994
 #6113943 4683333 6209778
     #shop_ids=[2384860,2114887,2814994,6113943,4683333,6209778]
-    shop_ids=[6116768]
+    #select DISTINCT shop_id from user WHERE shop_id is not NULL
+    sqlcon=MySQLdb.connect(host=env_data.mysql_host,user=env_data.mysql_user,passwd=env_data.mysql_psw,db='data_mining_xcj')
+    sqlc=sqlcon.cursor(MySQLdb.cursors.DictCursor)
+    sqlc.execute('select DISTINCT shop_id from user WHERE shop_id is not NULL')
+    shop_ids=[]
+    while True:
+        line=sqlc.fetchone()
+        if line==None:
+            break
+        shop_ids.append(int(line['shop_id']))
+    sqlc.close()
+    sqlcon.close()
+
+    print(shop_ids)
+
     for sid in shop_ids:
         try:
             find_shop_competitor(sid)
