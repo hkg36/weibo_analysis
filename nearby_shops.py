@@ -8,13 +8,11 @@ import MySQLdb
 import env_data
 import multiprocessing
 
-def MySQLConnect():
-    return MySQLdb.connect(host=env_data.mysql_host,user=env_data.mysql_user,passwd=env_data.mysql_psw,db='data_mining_xcj')
 #分析附近的微薄确定用户是否到达，制作店铺用户记录以及用户活动记录
 def analysis_point(center):
     print center
     fill_shop_ids=[]
-    con=pymongo.Connection(env_data.mongo_connect_str,read_preference=pymongo.ReadPreference.SECONDARY_ONLY)
+    con=pymongo.Connection('mongodb://xcj.server4/',read_preference=pymongo.ReadPreference.SECONDARY_ONLY)
     cur=con.dianpin.shop.find({"loc":{"$within":{"$center":[[center['lat'],center['lng']],0.01]}}},
         {'dianpin_id':1,'dianpin_tag':1,'loc':1,'shopname':1,'atmosphere':1,'recommend':1,'alias':1})
     for line in cur:
@@ -36,7 +34,7 @@ def analysis_point(center):
     print 'read %d shop'%len(fill_shop_ids)
     #找出周边所有地理位置微薄
     all_weibo={}
-    HALF_PICE_COUNT=10
+    HALF_PICE_COUNT=4
     RADIUS=0.012
     radius=RADIUS/HALF_PICE_COUNT
     for x_i in range(-HALF_PICE_COUNT,HALF_PICE_COUNT):
@@ -74,7 +72,7 @@ def analysis_point(center):
                 shop_weibo_log[match_shop_id]=shop_weibo
             shop_weibo.append(one_weibo)
 
-    sqldb=MySQLConnect()
+    sqldb=MySQLdb.connect(host=env_data.mysql_host,user=env_data.mysql_user,passwd=env_data.mysql_psw,db='data_mining_xcj')
     sqlc=sqldb.cursor()
     for shop_id in shop_weibo_log:
         shop_weibo=shop_weibo_log[shop_id]
@@ -120,14 +118,20 @@ if __name__ == '__main__':
         con.execute('update geoweibopoint set analysis_checked=1 where id=?',(pt['id'],))
         con.commit()"""
 
-    pool = multiprocessing.Pool(processes=4)
+    conhost=pymongo.Connection('mongodb://xcj.server4/',read_preference=pymongo.ReadPreference.SECONDARY_ONLY)
+    conhost.fsync(lock=True)
+    conhost.close()
+    pool = multiprocessing.Pool()
     for pt in all_point:
         pool.apply_async(analysis_point, (pt, ))
     pool.close()
     pool.join()
+    conhost=pymongo.Connection('mongodb://xcj.server4/',read_preference=pymongo.ReadPreference.SECONDARY_ONLY)
+    conhost.unlock()
+    conhost.close()
     print "Sub-process(es) done."
 
-    sqlcon=MySQLConnect()
+    sqlcon=MySQLdb.connect(host=env_data.mysql_host,user=env_data.mysql_user,passwd=env_data.mysql_psw,db='data_mining_xcj')
     sqlc=sqlcon.cursor()
     sqlc.execute('Truncate shop_user')
     sqlc.execute('insert into shop_user(shop_id,weibo_uid,counts) select shop_id,weibo_uid,count(*) from shop_user_log group by shop_id,weibo_uid')
