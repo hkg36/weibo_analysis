@@ -42,7 +42,7 @@ if __name__ == '__main__':
     client=weibo_tools.DefaultWeiboClient()
     for line in follow_count:
         try:
-            res=client.users__show(line[0])
+            res=client.users__show(uid=line[0])
             screen_name=res.get('screen_name')
             profile_url=res.get('profile_url')
             line.append(screen_name)
@@ -57,7 +57,7 @@ if __name__ == '__main__':
     fp=codecs.open('data/most_follow.csv','w','gbk')
     print >>fp,u'id,关注数,昵称,链接'
     for line in follow_count:
-        print >>fp,u'%d,%d,%s,%s'%line
+        print >>fp,u'%d,%d,%s,%s'%tuple(line)
     fp.close()
     fp=codecs.open('data/most_tag.csv','w','gbk')
     print >>fp,u'标签,数量'
