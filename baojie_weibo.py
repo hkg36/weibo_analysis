@@ -13,7 +13,6 @@ if __name__ == '__main__':
     tag_count={}
     users_list={}
 
-    count=0
     for line in cur:
         fl=line.get('friend_list')
         for friend in fl:
@@ -27,9 +26,6 @@ if __name__ == '__main__':
                     break
         users_list[line['id']]=line
 
-        count+=1
-        if count>100:
-            break
     follow_count=[[one,follow_count[one]] for one in follow_count]
     tag_count=[(one,tag_count[one]) for one in tag_count]
     users_list=[(one['id'],one['screen_name'],'http://weibo.com/'+one['profile_url'],one['followers_count']) for one in users_list.values()]
@@ -54,17 +50,17 @@ if __name__ == '__main__':
             line.append('')
             print e
 
-    fp=codecs.open('data/most_follow.csv','w','gbk')
+    fp=codecs.open('data/most_follow.csv','w','gbk',errors='replace')
     print >>fp,u'id,关注数,昵称,链接'
     for line in follow_count:
         print >>fp,u'%d,%d,%s,%s'%tuple(line)
     fp.close()
-    fp=codecs.open('data/most_tag.csv','w','gbk')
+    fp=codecs.open('data/most_tag.csv','w','gbk',errors='replace')
     print >>fp,u'标签,数量'
     for line in tag_count:
         print >>fp,u'%s,%d'%line
     fp.close()
-    fp=codecs.open('data/user_list.csv','w','gbk')
+    fp=codecs.open('data/user_list.csv','w','gbk',errors='replace')
     print >>fp,u'id,昵称,链接,粉丝'
     for line in users_list:
         print >>fp,u'%d,%s,%s,%d'%line
