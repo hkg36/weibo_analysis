@@ -12,7 +12,7 @@ import multiprocessing
 def analysis_point(center):
     print center
     fill_shop_ids=[]
-    con=pymongo.Connection('mongodb://xcj.server4/',read_preference=pymongo.ReadPreference.SECONDARY_ONLY)
+    con=pymongo.Connection(env_data.mongo_connect_str,read_preference=pymongo.ReadPreference.SECONDARY_ONLY)
     cur=con.dianpin.shop.find({"loc":{"$within":{"$center":[[center['lat'],center['lng']],0.01]}}},
         {'dianpin_id':1,'dianpin_tag':1,'loc':1,'shopname':1,'atmosphere':1,'recommend':1,'alias':1})
     for line in cur:
@@ -118,7 +118,7 @@ if __name__ == '__main__':
         con.execute('update geoweibopoint set analysis_checked=1 where id=?',(pt['id'],))
         con.commit()"""
 
-    conhost=pymongo.Connection('mongodb://xcj.server4/',read_preference=pymongo.ReadPreference.SECONDARY_ONLY)
+    conhost=pymongo.Connection(env_data.mongo_connect_str,read_preference=pymongo.ReadPreference.SECONDARY_ONLY)
     conhost.fsync(lock=True)
     conhost.close()
     pool = multiprocessing.Pool()
@@ -126,7 +126,7 @@ if __name__ == '__main__':
         pool.apply_async(analysis_point, (pt, ))
     pool.close()
     pool.join()
-    conhost=pymongo.Connection('mongodb://xcj.server4/',read_preference=pymongo.ReadPreference.SECONDARY_ONLY)
+    conhost=pymongo.Connection(env_data.mongo_connect_str,read_preference=pymongo.ReadPreference.SECONDARY_ONLY)
     conhost.unlock()
     conhost.close()
     print "Sub-process(es) done."
