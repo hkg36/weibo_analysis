@@ -5,26 +5,27 @@ import codecs
 import weibo_tools
 
 if __name__ == '__main__':
-    conn=pymongo.Connection(env_data.mongo_connect_str,read_preference=pymongo.ReadPreference.SECONDARY_ONLY)
+    conn=pymongo.Connection(env_data.mongo_connect_str)
 
-    cur=conn.weibolist.user.find({'friend_list':2169751551},
-        {'profile_url':True,'friend_list':True,'profile_url':True,'screen_name':True,'id':True,'tags':True,'followers_count':True})
     follow_count={}
     tag_count={}
     users_list={}
 
-    for line in cur:
-        fl=line.get('friend_list')
-        for friend in fl:
-            follow_count[friend]=follow_count.get(friend,0)+1
-        tl=line.get('tags')
-        for tag in tl:
-            for key in tag:
-                if key != 'weight':
-                    tag_name=tag[key]
-                    tag_count[tag_name]=tag_count.get(tag_name,0)+1
-                    break
-        users_list[line['id']]=line
+    with conn.weibolist.user.find({'friend_list':1931890934},
+        {'profile_url':True,'friend_list':True,'profile_url':True,'screen_name':True,'id':True,'tags':True,'followers_count':True},
+        timeout=False) as cur:
+        for line in cur:
+            fl=line.get('friend_list')
+            for friend in fl:
+                follow_count[friend]=follow_count.get(friend,0)+1
+            tl=line.get('tags')
+            for tag in tl:
+                for key in tag:
+                    if key != 'weight':
+                        tag_name=tag[key]
+                        tag_count[tag_name]=tag_count.get(tag_name,0)+1
+                        break
+            users_list[line['id']]=line
 
     follow_count=[[one,follow_count[one]] for one in follow_count]
     tag_count=[(one,tag_count[one]) for one in tag_count]
