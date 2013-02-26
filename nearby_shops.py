@@ -7,29 +7,14 @@ import mongo_autoreconnect
 import MySQLdb
 import env_data
 import multiprocessing
+import gzip
+import json
 
 #分析附近的微薄确定用户是否到达，制作店铺用户记录以及用户活动记录
-def analysis_point(center):
+def analysis_point(center,fill_shop_ids):
     print center
-    fill_shop_ids=[]
+
     con=pymongo.Connection(env_data.mongo_connect_str_backup)
-    cur=con.dianpin.shop.find({"loc":{"$within":{"$center":[[center['lat'],center['lng']],0.01]}}},
-        {'dianpin_id':1,'dianpin_tag':1,'loc':1,'shopname':1,'atmosphere':1,'recommend':1,'alias':1})
-    for line in cur:
-        line['shopname']=unicode(line['shopname'])
-        name_short=set((re.sub('(?i)\([^\)]*\)','',line['shopname']),))
-        if line.has_key('alias'):
-            name_short.add(line['alias'])
-        line['name_short']=name_short
-        alltag=set()
-        if line.has_key('dianpin_tag'):
-            alltag.update(line['dianpin_tag'])
-        if line.has_key('atmosphere'):
-            alltag.update(line['atmosphere'])
-        if line.has_key('recommend'):
-            alltag.update(line['recommend'])
-        line['alltag']=alltag
-        fill_shop_ids.append(line)
 
     print 'read %d shop'%len(fill_shop_ids)
     #找出周边所有地理位置微薄
@@ -90,37 +75,12 @@ def analysis_point(center):
     return 0
 
 if __name__ == '__main__':
-#港丽餐厅(大悦城店) 2384860
-#海底捞（西单店）2114887
-#麻辣诱惑(三里屯Village西南) 2814994
-# 6113943 4683333 6209778
-    """shop_ids=[2384860,2114887,2814994,6113943,4683333,6209778]
-    for sid in shop_ids:
-        analysis_shop(sid)"""
-    """f=open('shop_id2.txt')
-    lines=f.readlines()
-    f.close()
-    for id in lines:
-        analysis_shop(int(id))"""
-    con=sqlite3.connect('../fetchDianPin/GeoPointList.db')
-    try:
-        con.execute('alter table geoweibopoint add column analysis_checked int default 0')
-    except Exception,e:
-        print e
-    cc=con.cursor()
-    cc.execute('select id,lat,lng from geoweibopoint')
-    all_point=[]
-    for id,lat,lng in cc:
-        all_point.append({'id':id,'lat':lat,'lng':lng})
-
-    """for pt in all_point:
-        analysis_point(pt)
-        con.execute('update geoweibopoint set analysis_checked=1 where id=?',(pt['id'],))
-        con.commit()"""
+    f=gzip.open('data/allpointshop.gz','r')
+    shoppoints=json.load(f)
 
     pool = multiprocessing.Pool()
-    for pt in all_point:
-        pool.apply_async(analysis_point, (pt, ))
+    for pt in shoppoints:
+        pool.apply_async(analysis_point, (pt['center'],pt['shops']))
     pool.close()
     pool.join()
     print "Sub-process(es) done."

@@ -1,21 +1,20 @@
 #-*-coding:utf-8-*-
 import multiprocessing
 import time
-
-def func(msg):
-    for i in xrange(3):
-        print msg
-        time.sleep(1)
-	return "done " + msg
+import gzip
+from StringIO import StringIO
+import json
 
 if __name__ == "__main__":
-    pool = multiprocessing.Pool()
-    result = []
-    for i in xrange(50):
-        msg = "hello %d" %(i)
-        result.append(pool.apply_async(func, (msg, )))
-    pool.close()
-    pool.join()
-    for res in result:
-    	print res.get()
-	print "Sub-process(es) done."
+    buf=StringIO()
+    file=gzip.GzipFile(fileobj=buf,mode='w')
+    data=[]
+    for i in xrange(30):
+        data.append({'id':i})
+    json.dump(data,file)
+    file.close()
+
+    buf.pos=0
+    file=gzip.GzipFile(fileobj=buf)
+    data2=json.load(file)
+    file.close()
