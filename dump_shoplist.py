@@ -4,6 +4,8 @@ import pymongo
 import re
 import json
 import gzip
+import MySQLdb
+import env_data
 
 def GetAllPoint():
     con=sqlite3.connect('../fetchDianPin/GeoPointList.db')
@@ -18,11 +20,19 @@ def GetAllPoint():
         all_point.append({'id':id,'lat':lat,'lng':lng})
     cc.close()
     con.close()
+
+    sqldb=MySQLdb.connect(host=env_data.mysql_host,user=env_data.mysql_user,passwd=env_data.mysql_psw,db='data_mining_xcj')
+    cc=sqldb.cursor()
+    cc.execute('select id,lat,lng from GeoWeiboPoint')
+    for id,lat,lng in cc:
+        all_point.append({'id':id,'lat':lat,'lng':lng})
+    cc.close()
+    sqldb.close()
     return all_point
 def analysis_point(center):
     print center
     fill_shop_ids=[]
-    con=pymongo.Connection('mongodb://xcj.server4:27010/',read_preference=pymongo.ReadPreference.SECONDARY_ONLY)
+    con=pymongo.Connection('mongodb://xcj.server4:27010/')
     cur=con.dianpin.shop.find({"loc":{"$within":{"$center":[[center['lat'],center['lng']],0.01]}}},
                               {'_id':False,'dianpin_id':1,'dianpin_tag':1,'loc':1,'shopname':1,'atmosphere':1,'recommend':1,'alias':1})
     for line in cur:

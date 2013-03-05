@@ -3,15 +3,18 @@ import pymongo
 import env_data
 import codecs
 import weibo_tools
+import sys
 
 if __name__ == '__main__':
+    weiboid=int(sys.argv[1])
+
     conn=pymongo.Connection(env_data.mongo_connect_str)
 
     follow_count={}
     tag_count={}
     users_list={}
 
-    with conn.weibolist.user.find({'friend_list':1931890934},
+    with conn.weibolist.user.find({'friend_list':weiboid},
         {'profile_url':True,'friend_list':True,'profile_url':True,'screen_name':True,'id':True,'tags':True,'followers_count':True},
         timeout=False) as cur:
         for line in cur:
