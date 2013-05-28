@@ -78,9 +78,9 @@ def analysis_point(center,fill_shop_ids,mongodb_url):
 if __name__ == '__main__':
     parser = OptionParser()
     parser.add_option("-s", "--server", dest="server",
-                      help="set mongo db ip", default='218.241.207.46:27011')
+                      help="set mongo db ip (like 127.0.0.1:27010)", default='218.241.207.45:27011')
     parser.add_option("-a", "--area",dest="area", default=None,
-                      help="set area name")
+                      help="set area id,must be number")
 
     (options, args) = parser.parse_args()
     mongodb_server='mongodb://%s/'%(options.server)
