@@ -26,10 +26,10 @@ def analysis_point(center,fill_shop_ids,mongodb_url):
     for x_i in range(-HALF_PICE_COUNT,HALF_PICE_COUNT):
         for y_i in range(-HALF_PICE_COUNT,HALF_PICE_COUNT):
             area=[[center['lat']+radius*x_i,center['lng']+radius*y_i],[center['lat']+radius*(x_i+1),center['lng']+radius*(y_i+1)]]
-            with con.weibolist.weibo.find({'pos':{'$within':{'$box':area}}}) as cur:
+            with con.weibocontent.weibo.find({'pos':{'$within':{'$box':area}}}) as cur:
                 for line in cur:
                     line['clean_word']=re.sub(u"(?i)\w{0,4}://[\w\d./]*","",line['word'])
-                    all_weibo[line['weibo_id']]=line
+                    all_weibo[line['_id']]=line
             print 'read pice %d,%d to %d weibo'%(x_i,y_i,len(all_weibo))
 
     print 'read %d weibo'%len(all_weibo)
@@ -66,7 +66,7 @@ def analysis_point(center,fill_shop_ids,mongodb_url):
             sqlc.execute('insert ignore shop_user_log(shop_id,weibo_uid,weibo_id,time) values(%s,%s,%s,%s)',
                 (shop_id,
                 one_weibo['uid'],
-                one_weibo['weibo_id'],
+                one_weibo['_id'],
                 one_weibo['time']))
 
     sqldb.commit()

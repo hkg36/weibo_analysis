@@ -1,24 +1,28 @@
-#-*-coding:utf-8-*-
+#-*- coding: utf-8 -*-
+import paramiko
 
-from multiprocessing import Pool
-import random
+def ssh2(ip,username,passwd,cmd):
+    try:
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(ip,22,username,passwd,timeout=5)
+        for m in cmd:
+            stdin, stdout, stderr = ssh.exec_command(m)
+#           stdin.write("Y")   #简单交互，输入 ‘Y’ 
+            out = stdout.readlines()
+            #屏幕输出
+            for o in out:
+                print o,
+        print '%s\tOK\n'%(ip)
+        ssh.close()
+    except :
+        print '%s\tError\n'%(ip)
 
-value=9
-def increment(x):
-    return value + 1
 
-def decrement(x):
-    return value - 1
+if __name__=='__main__':
+    cmd = ['ls','echo hello!']#你要执行的命令列表
+    username = "root"  #用户名
+    passwd = "bigdata_xcj"    #密码
 
-def initer():
-    global value
-    value=random.randint(20,1000)
-
-if __name__ == '__main__':
-    pool = Pool(processes=2,initializer=initer)
-    res1 = pool.map_async(increment, range(10))
-    res1.wait()
-    res2 = pool.map_async(decrement, range(10))
-    res2.wait()
-    print res1.get(timeout=1)
-    print res2.get(timeout=1)
+    ip = '124.207.209.57'
+    ssh2(ip,username,passwd,cmd)
